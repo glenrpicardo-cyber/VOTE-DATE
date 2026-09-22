@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Class of 2001 — Reunion Date Vote</title>
+<style>
+  * { box-sizing:border-box; }
+  html,body { margin:0; min-height:100%; background:#111; font-family:Georgia,"Times New Roman",serif; }
+  body { display:flex; justify-content:center; align-items:flex-start; padding:18px; }
+  .vote-card {
+    position:relative; width:min(100%,1100px); line-height:0;
+    box-shadow:0 16px 50px rgba(0,0,0,.45); overflow:hidden; border-radius:8px;
+  }
+  .art { display:block; width:100%; height:auto; }
+  .overlay { position:absolute; inset:0; pointer-events:none; }
+  .field-panel {
+    position:absolute; left:29.5%; right:29.5%; bottom:3.3%;
+    pointer-events:auto; display:grid; grid-template-columns:1fr 1fr; gap:9px;
+  }
+  .field {
+    min-width:0; border:1px solid rgba(110,63,18,.55); border-radius:7px;
+    background:rgba(255,249,228,.94); color:#3d160e;
+    padding:10px 12px; font:600 15px/1.15 Arial,sans-serif;
+    box-shadow:0 3px 12px rgba(0,0,0,.25);
+  }
+  .field::placeholder { color:#795c50; opacity:.9; }
+  .date-hit {
+    position:absolute; pointer-events:auto; cursor:pointer; border:0; background:transparent;
+    padding:0; margin:0; outline:none;
+  }
+  /* Positions are percentages of the supplied 1536x1024 artwork. */
+  .d1 { left:37.4%; top:50.7%; width:27.0%; height:6.0%; }
+  .d2 { left:37.4%; top:58.7%; width:27.0%; height:6.0%; }
+  .d3 { left:37.4%; top:66.8%; width:27.0%; height:6.0%; }
+  .d4 { left:37.4%; top:74.7%; width:27.0%; height:6.0%; }
+  .underline {
+    position:absolute; display:none; height:4px; border-radius:3px;
+    background:#3f170f; pointer-events:none;
+  }
+  .u1 { left:43.6%; top:56.0%; width:20.2%; }
+  .u2 { left:43.6%; top:64.0%; width:20.2%; }
+  .u3 { left:43.6%; top:72.0%; width:20.2%; }
+  .u4 { left:43.6%; top:79.9%; width:20.2%; }
+  .date-hit.selected + .underline { display:block; }
+  .submit {
+    position:absolute; left:41.5%; right:41.5%; bottom:0.6%;
+    pointer-events:auto; cursor:pointer; border:2px solid #8d5b0c;
+    border-radius:999px; padding:10px 20px; color:#fff7dc;
+    background:linear-gradient(#9d6a14,#704209); font:700 16px/1 Arial,sans-serif;
+    letter-spacing:.08em; text-transform:uppercase; box-shadow:0 4px 10px rgba(0,0,0,.3);
+  }
+  .submit:disabled { opacity:.55; cursor:not-allowed; }
+  .status {
+    position:fixed; z-index:20; left:50%; transform:translateX(-50%);
+    bottom:18px; max-width:min(92vw,650px); padding:11px 16px; border-radius:8px;
+    background:#222; color:#fff; font:600 14px/1.35 Arial,sans-serif;
+    box-shadow:0 6px 24px rgba(0,0,0,.35); display:none; text-align:center;
+  }
+  .status.show { display:block; }
+  .status.ok { background:#245d35; } .status.err { background:#7d2929; }
+  .lock-note {
+    position:absolute; left:29.5%; right:29.5%; bottom:12.1%;
+    text-align:center; color:#4b2115; font:600 12px/1.2 Arial,sans-serif;
+    pointer-events:none; text-shadow:0 1px rgba(255,255,255,.5);
+  }
+  @media (max-width:700px) {
+    body { padding:0; }
+    .vote-card { width:100%; border-radius:0; }
+    .field-panel { left:23%; right:23%; bottom:3.1%; grid-template-columns:1fr; gap:5px; }
+    .field { padding:7px 9px; font-size:12px; }
+    .submit { left:38%; right:38%; padding:8px 10px; font-size:12px; }
+    .lock-note { left:23%; right:23%; bottom:16.4%; font-size:9px; }
+    .underline { height:3px; }
+  }
+</style>
+</head>
+<body>
+<div class="vote-card" id="voteCard">
+  <img class="art" src="reunion-vote-background.png" alt="Class of 2001 reunion date vote">
+  <div class="overlay">
+    <button class="date-hit d1" data-date="12th Dec '26" aria-label="12th December 2026"></button><span class="underline u1"></span>
+    <button class="date-hit d2" data-date="16th Jan '27" aria-label="16th January 2027"></button><span class="underline u2"></span>
+    <button class="date-hit d3" data-date="23rd Jan '27" aria-label="23rd January 2027"></button><span class="underline u3"></span>
+    <button class="date-hit d4" data-date="6th Feb '27" aria-label="6th February 2027"></button><span class="underline u4"></span>
+
+    <div class="lock-note" id="lockNote">Enter your full name and 10th Grade Division to unlock voting.</div>
+    <div class="field-panel">
+      <input id="fullName" class="field" type="text" autocomplete="name" placeholder="Full name" maxlength="100">
+      <input id="division" class="field" type="text" placeholder="10th Grade Division" maxlength="30">
+    </div>
+    <button id="submitBtn" class="submit" type="button" disabled>Submit Vote</button>
+  </div>
+</div>
+<div id="status" class="status"></div>
+
+<script>
+/*
+  IMPORTANT:
+  Replace APPS_SCRIPT_URL below with your deployed Google Apps Script Web App URL.
+*/
+const APPS_SCRIPT_URL = "PASTE_YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE";
+
+const hits = [...document.querySelectorAll(".date-hit")];
+const fullName = document.getElementById("fullName");
+const division = document.getElementById("division");
+const submitBtn = document.getElementById("submitBtn");
+const lockNote = document.getElementById("lockNote");
+const statusBox = document.getElementById("status");
+let selectedDate = "";
+
+function readyToVote() {
+  const ready = fullName.value.trim().length > 1 && division.value.trim().length > 0;
+  hits.forEach(h => h.style.pointerEvents = ready ? "auto" : "none");
+  hits.forEach(h => h.style.cursor = ready ? "pointer" : "not-allowed");
+  submitBtn.disabled = !(ready && selectedDate);
+  lockNote.textContent = ready ? "Select one date, then submit your vote." :
+                                  "Enter your full name and 10th Grade Division to unlock voting.";
+}
+
+function showStatus(message, type="") {
+  statusBox.textContent = message;
+  statusBox.className = "status show " + type;
+  setTimeout(() => statusBox.classList.remove("show"), 6000);
+}
+
+[fullName, division].forEach(el => el.addEventListener("input", readyToVote));
+
+hits.forEach((hit) => {
+  hit.addEventListener("click", () => {
+    hits.forEach(h => h.classList.remove("selected"));
+    hit.classList.add("selected");
+    selectedDate = hit.dataset.date;
+    submitBtn.disabled = false;
+    lockNote.textContent = "Selected: " + selectedDate;
+  });
+});
+
+submitBtn.addEventListener("click", async () => {
+  const name = fullName.value.trim();
+  const div = division.value.trim();
+
+  if (!name || !div || !selectedDate) {
+    showStatus("Please enter your full name, 10th Grade Division, and select a date.", "err");
+    return;
+  }
+  if (APPS_SCRIPT_URL.includes("PASTE_YOUR")) {
+    showStatus("The Google Sheet connection has not been configured yet.", "err");
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Submitting…";
+
+  try {
+    /*
+      text/plain avoids a browser CORS preflight. The Apps Script receives JSON
+      through e.postData.contents.
+    */
+    const response = await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ fullName:name, division:div, date:selectedDate })
+    });
+    const result = await response.json();
+
+    if (result.ok) {
+      showStatus("Your vote has been recorded. You can vote only once.", "ok");
+      hits.forEach(h => h.style.pointerEvents = "none");
+      fullName.disabled = true;
+      division.disabled = true;
+      submitBtn.textContent = "Vote Submitted";
+      submitBtn.disabled = true;
+      lockNote.textContent = "Thank you. Your vote has been recorded.";
+    } else {
+      showStatus(result.message || "Your vote could not be recorded.", "err");
+      submitBtn.textContent = "Submit Vote";
+      readyToVote();
+    }
+  } catch (err) {
+    showStatus("Could not connect to the voting sheet. Please try again.", "err");
+    submitBtn.textContent = "Submit Vote";
+    readyToVote();
+  }
+});
+readyToVote();
+</script>
+</body>
+</html>
